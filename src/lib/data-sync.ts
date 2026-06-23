@@ -14,10 +14,14 @@ export type DocumentKey =
   | "expenses"
   | "contractors";
 
+const SYNC_CHANNEL = "shuoyu-sync";
+const POLL_INTERVAL_MS = 30_000;
+
 const cache = new Map<string, unknown>();
 let profilesCache: User[] = [];
 let ready = false;
 let syncing = false;
+let channelReady = false;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -52,6 +56,28 @@ export function setDocument<T>(key: DocumentKey, data: T) {
   }
 }
 
+async function reloadDocument(key: DocumentKey) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("app_documents")
+    .select("data")
+    .eq("id", key)
+    .single();
+  if (!error && data) {
+    cache.set(key, data.data);
+    notify();
+  }
+}
+
+async function broadcastDocUpdate(key: DocumentKey) {
+  if (!channel || !channelReady) return;
+  await channel.send({
+    type: "broadcast",
+    event: "doc-updated",
+    payload: { key },
+  });
+}
+
 async function persistDocument(key: DocumentKey, data: unknown) {
   const supabase = createClient();
   const { error } = await supabase.from("app_documents").upsert({
@@ -59,7 +85,11 @@ async function persistDocument(key: DocumentKey, data: unknown) {
     data,
     updated_at: new Date().toISOString(),
   });
-  if (error) console.error(`[data-sync] save ${key} failed:`, error.message);
+  if (error) {
+    console.error(`[data-sync] save ${key} failed:`, error.message);
+    return;
+  }
+  await broadcastDocUpdate(key);
 }
 
 export function getProfilesCache(): User[] {
@@ -116,6 +146,7 @@ export async function loadAllData(): Promise<void> {
 let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let visibilityHandler: (() => void) | null = null;
+let onlineHandler: (() => void) | null = null;
 
 function applyRemoteDocument(row: { id?: string; data?: unknown } | null) {
   if (row?.id) {
@@ -129,14 +160,24 @@ export function subscribeRealtime() {
 
   const supabase = createClient();
   channel = supabase
-    .channel("shuoyu-realtime")
+    .channel(SYNC_CHANNEL, {
+      config: { broadcast: { self: false } },
+    })
+    .on("broadcast", { event: "doc-updated" }, ({ payload }) => {
+      const key = (payload as { key?: DocumentKey })?.key;
+      if (key) void reloadDocument(key);
+      else void loadAllData();
+    })
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "app_documents" },
       (payload) => {
-        applyRemoteDocument(
-          payload.new as { id?: string; data?: unknown } | null
-        );
+        const row = payload.new as { id?: string; data?: unknown } | null;
+        if (row?.id && row.data !== undefined) {
+          applyRemoteDocument(row);
+        } else if (row?.id) {
+          void reloadDocument(row.id as DocumentKey);
+        }
       }
     )
     .on(
@@ -147,7 +188,9 @@ export function subscribeRealtime() {
       }
     )
     .subscribe((status) => {
+      channelReady = status === "SUBSCRIBED";
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        channelReady = false;
         void loadAllData();
       }
     });
@@ -160,7 +203,7 @@ function startPolling() {
   if (!isSupabaseEnabled() || pollTimer) return;
   pollTimer = setInterval(() => {
     void loadAllData();
-  }, 4000);
+  }, POLL_INTERVAL_MS);
 }
 
 function stopPolling() {
@@ -171,16 +214,22 @@ function stopPolling() {
 }
 
 function startVisibilitySync() {
-  if (!isSupabaseEnabled() || visibilityHandler || typeof document === "undefined") {
-    return;
+  if (!isSupabaseEnabled() || typeof document === "undefined") return;
+
+  if (!visibilityHandler) {
+    visibilityHandler = () => {
+      if (document.visibilityState === "visible") {
+        void loadAllData();
+      }
+    };
+    document.addEventListener("visibilitychange", visibilityHandler);
+    window.addEventListener("focus", visibilityHandler);
   }
-  visibilityHandler = () => {
-    if (document.visibilityState === "visible") {
-      void loadAllData();
-    }
-  };
-  document.addEventListener("visibilitychange", visibilityHandler);
-  window.addEventListener("focus", visibilityHandler);
+
+  if (!onlineHandler) {
+    onlineHandler = () => void loadAllData();
+    window.addEventListener("online", onlineHandler);
+  }
 }
 
 function stopVisibilitySync() {
@@ -189,9 +238,14 @@ function stopVisibilitySync() {
     window.removeEventListener("focus", visibilityHandler);
     visibilityHandler = null;
   }
+  if (onlineHandler && typeof window !== "undefined") {
+    window.removeEventListener("online", onlineHandler);
+    onlineHandler = null;
+  }
 }
 
 export function unsubscribeRealtime() {
+  channelReady = false;
   stopPolling();
   stopVisibilitySync();
   if (channel) {
