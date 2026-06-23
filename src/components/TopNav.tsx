@@ -13,7 +13,7 @@ const navItems = [
   { href: "/approvals", label: "待審核", icon: "✅", roles: ["admin", "manager"] as const },
   { href: "/remuneration", label: "勞務報酬單", icon: "📄" },
   { href: "/attendance", label: "出勤紀錄", icon: "🕐" },
-  { href: "/punch", label: "出勤設置", icon: "📱" },
+  { href: "/punch", label: "出勤打卡", icon: "📱" },
   { href: "/expenses", label: "支出管理", icon: "💰" },
   { href: "/users", label: "用戶管理", icon: "👥", roles: ["admin", "manager"] as const },
 ];
