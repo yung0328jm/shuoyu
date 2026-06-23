@@ -27,6 +27,8 @@ export interface CalendarEvent {
   entryCategory?: "labor" | "contractor";
   headCount?: number;
   registeredBy?: string;
+  /** 勞務進廠中（尚未離廠登記） */
+  onSite?: boolean;
 }
 
 export type LeaveType =

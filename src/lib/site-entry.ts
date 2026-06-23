@@ -68,7 +68,8 @@ function upsertSchedulePair(
           ...personnel,
           label: personnel.label ?? e.label,
           startTime: personnel.startTime ?? e.startTime,
-          endTime: personnel.endTime ?? e.endTime,
+          endTime: personnel.endTime !== undefined ? personnel.endTime : e.endTime,
+          onSite: personnel.onSite !== undefined ? personnel.onSite : e.onSite,
           registeredBy: personnel.registeredBy ?? e.registeredBy,
         };
       }
@@ -141,6 +142,19 @@ export function syncLaborToCalendar(input: LaborEntryInput): void {
   });
 }
 
+export function isLaborOnSite(
+  date: string,
+  site: string,
+  userId: string,
+  userName: string
+): boolean {
+  const dayEvents = getCalendarEvents().filter((e) => e.date === date);
+  const existing = findLaborEvent(dayEvents, site, userId, userName);
+  if (!existing?.startTime) return false;
+  if (existing.onSite === true) return true;
+  return !existing.endTime;
+}
+
 export function registerLaborEntry(
   date: string,
   site: string,
@@ -161,8 +175,9 @@ export function registerLaborEntry(
       label: userName,
       userId,
       startTime,
-      endTime: existing?.endTime ?? "17:00",
+      endTime: undefined,
       entryCategory: "labor",
+      onSite: true,
       registeredBy,
     },
     existing?.scheduleGroupId
@@ -198,7 +213,7 @@ export function registerLaborExit(
   const startTime = existing.startTime ?? "08:00";
   const updated = all.map((e) =>
     e.id === existing.id
-      ? { ...e, endTime, registeredBy }
+      ? { ...e, endTime, onSite: false, registeredBy }
       : e
   );
   saveCalendarEvents(updated);
@@ -251,16 +266,77 @@ export function syncContractorToCalendar(input: ContractorEntryInput): void {
   });
 }
 
+export function syncLaborScheduleForSite(
+  date: string,
+  site: string,
+  personnel: { userId: string; userName: string }[],
+  registeredBy: string
+): { added: number; removed: number } {
+  let added = 0;
+  let removed = 0;
+  let all = getCalendarEvents();
+  const dayEvents = all.filter((e) => e.date === date);
+  const selectedIds = new Set(personnel.map((p) => p.userId));
+
+  for (const pe of dayEvents) {
+    if (pe.type !== "personnel" || pe.entryCategory === "contractor") continue;
+    if (resolveSiteForPersonnel(pe, dayEvents) !== site) continue;
+    if (!pe.userId || selectedIds.has(pe.userId)) continue;
+    if (pe.startTime) continue;
+    const groupId = pe.scheduleGroupId;
+    if (groupId) {
+      all = all.filter(
+        (e) => !(e.date === date && e.scheduleGroupId === groupId)
+      );
+      removed++;
+    }
+  }
+
+  for (const p of personnel) {
+    const currentDay = all.filter((e) => e.date === date);
+    if (findLaborEvent(currentDay, site, p.userId, p.userName)) continue;
+    all = upsertSchedulePair(all, date, site, {
+      label: p.userName,
+      userId: p.userId,
+      entryCategory: "labor",
+      registeredBy,
+    });
+    added++;
+  }
+
+  saveCalendarEvents(all);
+  return { added, removed };
+}
+
+export function formatLaborEntryTimes(pe: CalendarEvent): {
+  startTime: string;
+  endTime: string;
+} {
+  if (!pe.startTime) {
+    return { startTime: "—", endTime: "待掃描打卡" };
+  }
+  if (pe.onSite) {
+    return { startTime: pe.startTime, endTime: "進廠中" };
+  }
+  return {
+    startTime: pe.startTime,
+    endTime: pe.endTime ?? "—",
+  };
+}
+
 export function getDaySiteEntries(date: string, site: string) {
   const dayEvents = getCalendarEvents().filter((e) => e.date === date);
   return dayEvents
     .filter((e) => e.type === "personnel")
     .filter((pe) => resolveSiteForPersonnel(pe, dayEvents) === site)
-    .map((pe) => ({
-      id: pe.id,
-      name: pe.label,
-      startTime: pe.startTime ?? "—",
-      endTime: pe.endTime ?? "—",
-      category: pe.entryCategory ?? "labor",
-    }));
+    .map((pe) => {
+      const times = formatLaborEntryTimes(pe);
+      return {
+        id: pe.id,
+        name: pe.label,
+        startTime: times.startTime,
+        endTime: times.endTime,
+        category: pe.entryCategory ?? "labor",
+      };
+    });
 }

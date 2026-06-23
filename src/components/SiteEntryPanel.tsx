@@ -5,31 +5,12 @@ import { useAuth } from "@/context/AuthContext";
 import { getSites } from "@/lib/sites";
 import { getEmployeeUsers } from "@/lib/storage";
 import {
-  syncLaborToCalendar,
-  registerLaborEntry,
-  registerLaborExit,
+  syncLaborScheduleForSite,
   getDaySiteEntries,
-  formatTime,
+  isLaborOnSite,
 } from "@/lib/site-entry";
 import { User } from "@/lib/types";
 import { useDataSyncVersion } from "@/hooks/useDataSyncVersion";
-
-const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
-const MINUTES = ["00", "15", "30", "45"];
-
-interface PersonTime {
-  startHour: string;
-  startMinute: string;
-  endHour: string;
-  endMinute: string;
-}
-
-const defaultPersonTime = (): PersonTime => ({
-  startHour: "08",
-  startMinute: "00",
-  endHour: "17",
-  endMinute: "00",
-});
 
 export function SiteEntryPanel({
   initialDate,
@@ -48,7 +29,6 @@ export function SiteEntryPanel({
   const [sites, setSites] = useState<string[]>([]);
   const [employees, setEmployees] = useState<User[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [personTimes, setPersonTimes] = useState<Record<string, PersonTime>>({});
   const [laborOpen, setLaborOpen] = useState(true);
   const [commonOpen, setCommonOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -57,12 +37,26 @@ export function SiteEntryPanel({
     ReturnType<typeof getDaySiteEntries>
   >([]);
 
+  const loadScheduledSelection = (targetDate: string, targetSite: string) => {
+    const entries = getDaySiteEntries(targetDate, targetSite);
+    const empList = getEmployeeUsers();
+    const scheduledIds = empList
+      .filter((emp) =>
+        entries.some((e) => e.category === "labor" && e.name === emp.name)
+      )
+      .map((emp) => emp.id);
+    setSelectedIds(scheduledIds);
+    return entries;
+  };
+
   const refresh = () => {
     const siteList = getSites();
     setSites(siteList);
     setEmployees(getEmployeeUsers());
     if (!site && siteList.length > 0) setSite(siteList[0]);
-    if (date && site) setTodayEntries(getDaySiteEntries(date, site));
+    if (date && site) {
+      setTodayEntries(loadScheduledSelection(date, site));
+    }
   };
 
   useEffect(() => {
@@ -76,119 +70,48 @@ export function SiteEntryPanel({
   }, [date, site, syncVersion]);
 
   const toggleEmployee = (id: string) => {
-    setSelectedIds((prev) => {
-      if (prev.includes(id)) {
-        const next = prev.filter((x) => x !== id);
-        return next;
-      }
-      setPersonTimes((pt) => ({
-        ...pt,
-        [id]: pt[id] ?? defaultPersonTime(),
-      }));
-      return [...prev, id];
-    });
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
-  const selectAll = () => {
-    const ids = employees.map((e) => e.id);
-    setSelectedIds(ids);
-    setPersonTimes((pt) => {
-      const next = { ...pt };
-      ids.forEach((id) => {
-        if (!next[id]) next[id] = defaultPersonTime();
-      });
-      return next;
-    });
-  };
+  const selectAll = () => setSelectedIds(employees.map((e) => e.id));
 
   const clearSelected = () => setSelectedIds([]);
 
-  const updatePersonTime = (
-    id: string,
-    field: keyof PersonTime,
-    value: string
-  ) => {
-    setPersonTimes((pt) => ({
-      ...pt,
-      [id]: { ...(pt[id] ?? defaultPersonTime()), [field]: value },
-    }));
-  };
-
   const registeredBy = user?.name ?? user?.username ?? "—";
 
-  const handleSyncLabor = () => {
+  const handleSaveSchedule = () => {
     if (!site || selectedIds.length === 0) {
       setMessage("請選擇案場與至少一位承攬者");
       return;
     }
-    selectedIds.forEach((id) => {
-      const emp = employees.find((e) => e.id === id);
-      if (!emp) return;
-      const t = personTimes[id] ?? defaultPersonTime();
-      syncLaborToCalendar({
-        date,
-        site,
-        userId: emp.id,
-        userName: emp.name,
-        startTime: formatTime(t.startHour, t.startMinute),
-        endTime: formatTime(t.endHour, t.endMinute),
-        registeredBy,
-      });
-    });
-    setMessage(`已同步 ${selectedIds.length} 人至行事曆`);
-    refresh();
-    onSaved?.();
-  };
+    const personnel = selectedIds
+      .map((id) => employees.find((e) => e.id === id))
+      .filter((e): e is User => !!e)
+      .map((e) => ({ userId: e.id, userName: e.name }));
 
-  const handleLaborEntry = () => {
-    if (!site || selectedIds.length === 0) {
-      setMessage("請選擇案場與承攬者");
-      return;
-    }
-    selectedIds.forEach((id) => {
-      const emp = employees.find((e) => e.id === id);
-      if (!emp) return;
-      const t = personTimes[id] ?? defaultPersonTime();
-      registerLaborEntry(
-        date,
-        site,
-        emp.id,
-        emp.name,
-        formatTime(t.startHour, t.startMinute),
-        registeredBy
-      );
-    });
-    setMessage("進廠登記完成，已同步行事曆");
-    refresh();
-    onSaved?.();
-  };
+    const { added, removed } = syncLaborScheduleForSite(
+      date,
+      site,
+      personnel,
+      registeredBy
+    );
 
-  const handleLaborExit = () => {
-    if (!site || selectedIds.length === 0) {
-      setMessage("請選擇案場與承攬者");
-      return;
-    }
-    selectedIds.forEach((id) => {
-      const emp = employees.find((e) => e.id === id);
-      if (!emp) return;
-      const t = personTimes[id] ?? defaultPersonTime();
-      registerLaborExit(
-        date,
-        site,
-        emp.id,
-        emp.name,
-        formatTime(t.endHour, t.endMinute),
-        registeredBy
-      );
-    });
-    setMessage("離廠登記完成，已更新行事曆");
-    refresh();
+    const parts: string[] = [];
+    if (added > 0) parts.push(`新增 ${added} 人`);
+    if (removed > 0) parts.push(`移除 ${removed} 人`);
+    setMessage(
+      parts.length > 0
+        ? `排程已更新（${parts.join("、")}），進離廠時間請以 QR 掃描記錄`
+        : "排程無變更"
+    );
+    setTodayEntries(loadScheduledSelection(date, site));
     onSaved?.();
   };
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      {/* 日期 + 案場 */}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-xs text-[#8b95a5]">
           日期
@@ -216,7 +139,6 @@ export function SiteEntryPanel({
         </label>
       </div>
 
-      {/* 常用清單 */}
       <div className="rounded border border-[#2a3548] bg-[#111827]">
         <button
           type="button"
@@ -235,7 +157,6 @@ export function SiteEntryPanel({
         )}
       </div>
 
-      {/* 勞務承攬者 */}
       <section className="rounded border border-[#8b5a2b] bg-[#1a1510]">
         <button
           type="button"
@@ -243,7 +164,7 @@ export function SiteEntryPanel({
           className="flex w-full items-center justify-between px-4 py-3"
         >
           <span className="text-sm font-medium text-[#f0c040]">
-            勞務承攬者（登記即存當日，同步行事曆）
+            勞務承攬者（排程至行事曆，時間以 QR 掃描為準）
           </span>
           <span className="text-xs text-[#8b95a5]">
             {laborOpen ? "收合" : "展開"}
@@ -274,99 +195,56 @@ export function SiteEntryPanel({
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {employees.map((emp) => (
-                  <label
-                    key={emp.id}
-                    className={`flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-sm ${
-                      selectedIds.includes(emp.id)
-                        ? "border-[#f0c040] bg-[#2a2010] text-white"
-                        : "border-[#2a3548] text-[#c8cdd5] hover:bg-[#141e2e]"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(emp.id)}
-                      onChange={() => toggleEmployee(emp.id)}
-                      className="rounded"
-                    />
-                    {emp.name}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {selectedIds.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-xs text-[#8b95a5]">各人進離場時間</p>
-                {selectedIds.map((id) => {
-                  const emp = employees.find((e) => e.id === id);
-                  const t = personTimes[id] ?? defaultPersonTime();
+                {employees.map((emp) => {
+                  const onSite =
+                    site && isLaborOnSite(date, site, emp.id, emp.name);
                   return (
-                    <div
-                      key={id}
-                      className="rounded border border-[#2a3548] bg-[#0d1117] p-3"
+                    <label
+                      key={emp.id}
+                      className={`flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-sm ${
+                        selectedIds.includes(emp.id)
+                          ? "border-[#f0c040] bg-[#2a2010] text-white"
+                          : "border-[#2a3548] text-[#c8cdd5] hover:bg-[#141e2e]"
+                      }`}
                     >
-                      <div className="mb-2 text-sm font-medium text-white">
-                        {emp?.name}
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <TimeField
-                          label="進廠時間"
-                          hour={t.startHour}
-                          minute={t.startMinute}
-                          onHour={(v) => updatePersonTime(id, "startHour", v)}
-                          onMinute={(v) =>
-                            updatePersonTime(id, "startMinute", v)
-                          }
-                        />
-                        <TimeField
-                          label="離廠時間"
-                          hour={t.endHour}
-                          minute={t.endMinute}
-                          onHour={(v) => updatePersonTime(id, "endHour", v)}
-                          onMinute={(v) =>
-                            updatePersonTime(id, "endMinute", v)
-                          }
-                        />
-                      </div>
-                    </div>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(emp.id)}
+                        onChange={() => toggleEmployee(emp.id)}
+                        className="rounded"
+                      />
+                      <span className="flex items-center gap-1">
+                        {emp.name}
+                        {onSite && (
+                          <span className="text-[10px] text-[#34d399]">進廠中</span>
+                        )}
+                      </span>
+                    </label>
                   );
                 })}
               </div>
-            )}
-
-            <div className="grid gap-2 sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={handleSyncLabor}
-                className="rounded bg-[#8b6914] py-2.5 text-sm font-medium text-white hover:bg-[#a07a18]"
-              >
-                同步至行事曆
-              </button>
-              <button
-                type="button"
-                onClick={handleLaborEntry}
-                className="rounded border border-[#8b6914] py-2.5 text-sm text-[#f0c040] hover:bg-[#8b6914]/20"
-              >
-                進廠登記
-              </button>
-              <button
-                type="button"
-                onClick={handleLaborExit}
-                className="rounded border border-[#8b6914] py-2.5 text-sm text-[#f0c040] hover:bg-[#8b6914]/20"
-              >
-                離廠登記
-              </button>
             </div>
+
+            <p className="text-xs text-[#5a6578]">
+              進廠、離廠時間請至案場掃描 QR Code 打卡，系統會自動記錄並同步行事曆。
+            </p>
+
+            <button
+              type="button"
+              onClick={handleSaveSchedule}
+              disabled={selectedIds.length === 0}
+              className="w-full rounded bg-[#8b6914] py-2.5 text-sm font-medium text-white hover:bg-[#a07a18] disabled:opacity-50"
+            >
+              確認排程
+            </button>
           </div>
         )}
       </section>
 
-      {/* 當日登記 */}
       {todayEntries.length > 0 && (
         <section className="rounded border border-[#2a3548] bg-[#111827] p-4">
           <h3 className="mb-3 text-sm font-medium text-[#f0c040]">
-            {date} · {site} 已登記
+            {date} · {site} 已排程
           </h3>
           <div className="space-y-2">
             {todayEntries.map((entry) => (
@@ -378,7 +256,9 @@ export function SiteEntryPanel({
                   {entry.category === "contractor" ? "🏢" : "👷"} {entry.name}
                 </span>
                 <span className="text-[#4ecdc4]">
-                  {entry.startTime} – {entry.endTime}
+                  {entry.startTime === "—" && entry.endTime === "待掃描打卡"
+                    ? "待掃描打卡"
+                    : `${entry.startTime} – ${entry.endTime}`}
                 </span>
               </div>
             ))}
@@ -389,52 +269,6 @@ export function SiteEntryPanel({
       {message && (
         <p className="text-center text-sm text-green-400">{message}</p>
       )}
-    </div>
-  );
-}
-
-function TimeField({
-  label,
-  hour,
-  minute,
-  onHour,
-  onMinute,
-}: {
-  label: string;
-  hour: string;
-  minute: string;
-  onHour: (v: string) => void;
-  onMinute: (v: string) => void;
-}) {
-  return (
-    <div>
-      <span className="mb-1 block text-xs text-[#8b95a5]">{label}</span>
-      <div className="flex items-center gap-1">
-        <select
-          value={hour}
-          onChange={(e) => onHour(e.target.value)}
-          className="rounded border border-[#2a3548] bg-[#0d1117] px-2 py-2 text-sm text-white"
-        >
-          {HOURS.map((h) => (
-            <option key={h} value={h}>
-              {h}
-            </option>
-          ))}
-        </select>
-        <span className="text-xs text-[#8b95a5]">時</span>
-        <select
-          value={minute}
-          onChange={(e) => onMinute(e.target.value)}
-          className="rounded border border-[#2a3548] bg-[#0d1117] px-2 py-2 text-sm text-white"
-        >
-          {MINUTES.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-        <span className="text-xs text-[#8b95a5]">分</span>
-      </div>
     </div>
   );
 }
