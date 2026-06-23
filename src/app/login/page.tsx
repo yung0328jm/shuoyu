@@ -39,7 +39,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-[#0a0e17] px-6">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-[#f0c040]">礫宇事業群</h1>
+          <h1 className="text-3xl font-bold text-[#f0c040]">爍宇事業群</h1>
           <p className="mt-2 text-[#8b95a5]">企業管理系統</p>
         </div>
 

@@ -9,8 +9,8 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "礫宇事業群 - 企業管理系統",
-  description: "礫宇事業群企業管理系統 - 請假申請",
+  title: "爍宇事業群 - 企業管理系統",
+  description: "爍宇事業群企業管理系統 - 請假申請",
 };
 
 export default function RootLayout({

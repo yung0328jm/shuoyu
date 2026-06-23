@@ -79,7 +79,7 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-[#0a0e17] px-6 py-12">
       <div className="w-full max-w-md rounded-lg border border-[#2a3548] bg-[#111827] p-8">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-[#f0c040]">礫宇事業群</h1>
+          <h1 className="text-2xl font-bold text-[#f0c040]">爍宇事業群</h1>
           <p className="mt-1 text-sm text-[#8b95a5]">建立新帳號</p>
         </div>
 
