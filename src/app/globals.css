@@ -1,26 +1,36 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0e17;
+  --foreground: #e8eaed;
+  --surface: #111827;
+  --surface-2: #1a2234;
+  --border: #2a3548;
+  --gold: #f0c040;
+  --gold-dark: #c9a020;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), "Microsoft JhengHei", "PingFang TC", sans-serif;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+/* scrollbar for dark nav */
+.nav-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.nav-scroll::-webkit-scrollbar-thumb {
+  background: #3a4558;
+  border-radius: 2px;
 }
