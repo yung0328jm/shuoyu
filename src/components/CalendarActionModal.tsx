@@ -6,6 +6,7 @@ export type CalendarDayAction = "entry" | "leave" | "banRest";
 
 interface CalendarActionModalProps {
   date: string;
+  isAdmin?: boolean;
   onClose: () => void;
   onSelect: (action: CalendarDayAction) => void;
   onBanRestChanged?: () => void;
@@ -13,6 +14,7 @@ interface CalendarActionModalProps {
 
 export function CalendarActionModal({
   date,
+  isAdmin = false,
   onClose,
   onSelect,
   onBanRestChanged,
@@ -51,13 +53,15 @@ export function CalendarActionModal({
         </div>
 
         <div className="space-y-3">
-          <button
-            type="button"
-            onClick={() => onSelect("entry")}
-            className="w-full rounded-lg bg-[#f0c040] py-3.5 text-base font-medium text-[#1a1a1a] hover:bg-[#d4a830]"
-          >
-            入廠申請
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => onSelect("entry")}
+              className="w-full rounded-lg bg-[#f0c040] py-3.5 text-base font-medium text-[#1a1a1a] hover:bg-[#d4a830]"
+            >
+              入廠異動申請
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onSelect("leave")}

@@ -6,16 +6,22 @@ import { useAuth } from "@/context/AuthContext";
 import { getPendingApprovalCount } from "@/components/ApprovalsPanel";
 import { useEffect, useState } from "react";
 import { useDataSyncVersion } from "@/hooks/useDataSyncVersion";
+import { UserRole } from "@/lib/types";
 
-const navItems = [
+const navItems: {
+  href: string;
+  label: string;
+  icon: string;
+  roles?: readonly UserRole[];
+}[] = [
   { href: "/calendar", label: "行事曆", icon: "📅" },
-  { href: "/site-entry", label: "入廠申請", icon: "🏗" },
-  { href: "/approvals", label: "待審核", icon: "✅", roles: ["admin", "manager"] as const },
+  { href: "/site-entry", label: "入廠異動申請", icon: "🏗", roles: ["admin"] },
+  { href: "/approvals", label: "待審核", icon: "✅", roles: ["admin", "manager"] },
   { href: "/remuneration", label: "勞務報酬單", icon: "📄" },
   { href: "/attendance", label: "出勤紀錄", icon: "🕐" },
   { href: "/punch", label: "出勤打卡", icon: "📱" },
   { href: "/expenses", label: "支出管理", icon: "💰" },
-  { href: "/users", label: "用戶管理", icon: "👥", roles: ["admin", "manager"] as const },
+  { href: "/users", label: "用戶管理", icon: "👥", roles: ["admin", "manager"] },
 ];
 
 export function TopNav() {
@@ -42,7 +48,7 @@ export function TopNav() {
           .filter(
             (item) =>
               !("roles" in item) ||
-              (user && item.roles?.includes(user.role as "admin" | "manager"))
+              (user && item.roles?.includes(user.role))
           )
           .map((item) => {
           const active = pathname === item.href;

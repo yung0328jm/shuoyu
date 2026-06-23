@@ -21,7 +21,7 @@ export function SiteEntryModal({ date, onClose, onSaved }: SiteEntryModalProps) 
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#2a3548] bg-[#111827] px-6 py-4">
           <div>
-            <h3 className="text-lg font-semibold text-[#f0c040]">入廠申請</h3>
+            <h3 className="text-lg font-semibold text-[#f0c040]">入廠異動申請</h3>
             <p className="text-xs text-[#8b95a5]">日期：{formatSlashDate(date)}</p>
           </div>
           <button

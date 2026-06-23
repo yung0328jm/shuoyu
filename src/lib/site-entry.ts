@@ -1,10 +1,12 @@
 import { CalendarEvent } from "./types";
-import { getCalendarEvents, saveCalendarEvents } from "./storage";
+import { getCalendarEvents, saveCalendarEvents, getAttendanceRecords, saveAttendanceRecords } from "./storage";
 import { resolveSiteForPersonnel } from "./calendar-site";
 import {
   calcHoursFromTimes,
   syncAutoEmergencyEntry,
 } from "./emergency-hours";
+import { getSiteLateTime } from "./site-late-settings";
+import type { AttendanceStatus } from "./types";
 
 export function formatTime(hour: string, minute: string): string {
   return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
@@ -333,10 +335,112 @@ export function getDaySiteEntries(date: string, site: string) {
       const times = formatLaborEntryTimes(pe);
       return {
         id: pe.id,
+        userId: pe.userId,
         name: pe.label,
         startTime: times.startTime,
         endTime: times.endTime,
+        rawStartTime: pe.startTime,
+        rawEndTime: pe.endTime,
+        onSite: pe.onSite,
         category: pe.entryCategory ?? "labor",
       };
     });
+}
+
+export function updateLaborTimes(
+  date: string,
+  site: string,
+  eventId: string,
+  startTime: string,
+  endTime: string | undefined,
+  registeredBy: string
+): boolean {
+  const all = getCalendarEvents();
+  const event = all.find((e) => e.id === eventId);
+  if (!event || event.type !== "personnel" || event.entryCategory === "contractor") {
+    return false;
+  }
+
+  const onSite = !endTime;
+  const updated = all.map((e) =>
+    e.id === eventId
+      ? {
+          ...e,
+          startTime,
+          endTime: onSite ? undefined : endTime,
+          onSite,
+          registeredBy,
+        }
+      : e
+  );
+  saveCalendarEvents(updated);
+
+  if (event.userId) {
+    syncAttendanceFromLaborEdit(
+      event.userId,
+      event.label,
+      date,
+      site,
+      startTime,
+      onSite ? undefined : endTime
+    );
+  }
+
+  if (!onSite && endTime) {
+    syncAutoEmergencyEntry({
+      date,
+      personnel: event.label,
+      startTime,
+      endTime,
+      applicant: registeredBy,
+    });
+  }
+
+  return true;
+}
+
+function syncAttendanceFromLaborEdit(
+  userId: string,
+  userName: string,
+  date: string,
+  site: string,
+  startTime: string,
+  endTime?: string
+) {
+  const all = getAttendanceRecords();
+  const idx = all.findIndex(
+    (r) => r.userId === userId && r.date === date && r.site === site
+  );
+  const hours = endTime ? calcHoursBetween(startTime, endTime) : 0;
+  const threshold = getSiteLateTime(site);
+  let status: AttendanceStatus = startTime > threshold ? "late" : "normal";
+  if (endTime && hours > 8) status = "overtime";
+
+  if (idx === -1) {
+    saveAttendanceRecords([
+      {
+        id: `att-${Date.now()}`,
+        userId,
+        userName,
+        date,
+        checkIn: startTime,
+        checkOut: endTime ?? "",
+        hours,
+        site,
+        status,
+      },
+      ...all,
+    ]);
+    return;
+  }
+
+  const next = [...all];
+  next[idx] = {
+    ...next[idx],
+    checkIn: startTime,
+    checkOut: endTime ?? "",
+    hours,
+    status,
+  };
+  saveAttendanceRecords(next);
 }

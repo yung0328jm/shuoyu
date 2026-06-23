@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { getSites } from "@/lib/sites";
 import { getEmployeeUsers } from "@/lib/storage";
@@ -8,9 +9,26 @@ import {
   syncLaborScheduleForSite,
   getDaySiteEntries,
   isLaborOnSite,
+  updateLaborTimes,
 } from "@/lib/site-entry";
 import { User } from "@/lib/types";
 import { useDataSyncVersion } from "@/hooks/useDataSyncVersion";
+
+type DayEntry = ReturnType<typeof getDaySiteEntries>[number];
+
+type TimeEdit = {
+  start: string;
+  end: string;
+  stillOnSite: boolean;
+};
+
+function toTimeEdit(entry: DayEntry): TimeEdit {
+  return {
+    start: entry.rawStartTime ?? "08:00",
+    end: entry.rawEndTime ?? "17:00",
+    stillOnSite: entry.onSite === true || (!entry.rawEndTime && !!entry.rawStartTime),
+  };
+}
 
 export function SiteEntryPanel({
   initialDate,
@@ -30,12 +48,12 @@ export function SiteEntryPanel({
   const [employees, setEmployees] = useState<User[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [laborOpen, setLaborOpen] = useState(true);
+  const [timeOpen, setTimeOpen] = useState(true);
   const [commonOpen, setCommonOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [timeEdits, setTimeEdits] = useState<Record<string, TimeEdit>>({});
 
-  const [todayEntries, setTodayEntries] = useState<
-    ReturnType<typeof getDaySiteEntries>
-  >([]);
+  const [todayEntries, setTodayEntries] = useState<DayEntry[]>([]);
 
   const loadScheduledSelection = (targetDate: string, targetSite: string) => {
     const entries = getDaySiteEntries(targetDate, targetSite);
@@ -46,6 +64,15 @@ export function SiteEntryPanel({
       )
       .map((emp) => emp.id);
     setSelectedIds(scheduledIds);
+
+    const edits: Record<string, TimeEdit> = {};
+    entries
+      .filter((e) => e.category === "labor")
+      .forEach((e) => {
+        edits[e.id] = toTimeEdit(e);
+      });
+    setTimeEdits(edits);
+
     return entries;
   };
 
@@ -103,12 +130,49 @@ export function SiteEntryPanel({
     if (removed > 0) parts.push(`移除 ${removed} 人`);
     setMessage(
       parts.length > 0
-        ? `排程已更新（${parts.join("、")}），進離廠時間請以 QR 掃描記錄`
+        ? `排程已更新（${parts.join("、")}）`
         : "排程無變更"
     );
     setTodayEntries(loadScheduledSelection(date, site));
     onSaved?.();
   };
+
+  const handleSaveTimeAdjustments = () => {
+    if (!site) return;
+    const laborEntries = todayEntries.filter((e) => e.category === "labor");
+    if (laborEntries.length === 0) {
+      setMessage("尚無可異動的承攬者紀錄");
+      return;
+    }
+
+    let updated = 0;
+    for (const entry of laborEntries) {
+      const edit = timeEdits[entry.id];
+      if (!edit?.start) continue;
+      const ok = updateLaborTimes(
+        date,
+        site,
+        entry.id,
+        edit.start,
+        edit.stillOnSite ? undefined : edit.end || undefined,
+        registeredBy
+      );
+      if (ok) updated++;
+    }
+
+    setMessage(updated > 0 ? `已更新 ${updated} 人進離廠時間` : "時間無變更");
+    setTodayEntries(loadScheduledSelection(date, site));
+    onSaved?.();
+  };
+
+  const updateTimeEdit = (id: string, patch: Partial<TimeEdit>) => {
+    setTimeEdits((prev) => ({
+      ...prev,
+      [id]: { ...(prev[id] ?? { start: "08:00", end: "17:00", stillOnSite: false }), ...patch },
+    }));
+  };
+
+  const laborEntries = todayEntries.filter((e) => e.category === "labor");
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -164,7 +228,7 @@ export function SiteEntryPanel({
           className="flex w-full items-center justify-between px-4 py-3"
         >
           <span className="text-sm font-medium text-[#f0c040]">
-            勞務承攬者（排程至行事曆，時間以 QR 掃描為準）
+            勞務承攬者排程
           </span>
           <span className="text-xs text-[#8b95a5]">
             {laborOpen ? "收合" : "展開"}
@@ -226,7 +290,7 @@ export function SiteEntryPanel({
             </div>
 
             <p className="text-xs text-[#5a6578]">
-              進廠、離廠時間請至案場掃描 QR Code 打卡，系統會自動記錄並同步行事曆。
+              一般人員請至案場掃描 QR Code 打卡；管理員可於下方異動進離廠時間。
             </p>
 
             <button
@@ -240,6 +304,85 @@ export function SiteEntryPanel({
           </div>
         )}
       </section>
+
+      {laborEntries.length > 0 && (
+        <section className="rounded border border-[#2a3548] bg-[#111827]">
+          <button
+            type="button"
+            onClick={() => setTimeOpen(!timeOpen)}
+            className="flex w-full items-center justify-between px-4 py-3"
+          >
+            <span className="text-sm font-medium text-[#f0c040]">
+              進離廠時間異動
+            </span>
+            <span className="text-xs text-[#8b95a5]">
+              {timeOpen ? "收合" : "展開"}
+            </span>
+          </button>
+          {timeOpen && (
+            <div className="space-y-3 border-t border-[#2a3548] px-4 py-4">
+              {laborEntries.map((entry) => {
+                const edit = timeEdits[entry.id] ?? toTimeEdit(entry);
+                return (
+                  <div
+                    key={entry.id}
+                    className="rounded border border-[#2a3548] bg-[#0d1117] p-3"
+                  >
+                    <div className="mb-3 text-sm font-medium text-white">
+                      {entry.name}
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="block text-xs text-[#8b95a5]">
+                        進廠時間
+                        <input
+                          type="time"
+                          value={edit.start}
+                          onChange={(e) =>
+                            updateTimeEdit(entry.id, { start: e.target.value })
+                          }
+                          className="mt-1 w-full rounded border border-[#2a3548] bg-[#111827] px-3 py-2 text-sm text-white"
+                        />
+                      </label>
+                      <label className="block text-xs text-[#8b95a5]">
+                        離廠時間
+                        <input
+                          type="time"
+                          value={edit.end}
+                          disabled={edit.stillOnSite}
+                          onChange={(e) =>
+                            updateTimeEdit(entry.id, { end: e.target.value })
+                          }
+                          className="mt-1 w-full rounded border border-[#2a3548] bg-[#111827] px-3 py-2 text-sm text-white disabled:opacity-50"
+                        />
+                      </label>
+                    </div>
+                    <label className="mt-2 flex items-center gap-2 text-xs text-[#8b95a5]">
+                      <input
+                        type="checkbox"
+                        checked={edit.stillOnSite}
+                        onChange={(e) =>
+                          updateTimeEdit(entry.id, {
+                            stillOnSite: e.target.checked,
+                          })
+                        }
+                        className="rounded"
+                      />
+                      仍在廠內（尚未離廠）
+                    </label>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={handleSaveTimeAdjustments}
+                className="w-full rounded bg-[#f0c040] py-2.5 text-sm font-medium text-[#1a1a1a] hover:bg-[#d4a830]"
+              >
+                儲存時間異動
+              </button>
+            </div>
+          )}
+        </section>
+      )}
 
       {todayEntries.length > 0 && (
         <section className="rounded border border-[#2a3548] bg-[#111827] p-4">

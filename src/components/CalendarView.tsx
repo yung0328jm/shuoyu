@@ -255,6 +255,7 @@ export function CalendarView() {
       {selectedDate && !dayAction && (
         <CalendarActionModal
           date={selectedDate}
+          isAdmin={user?.role === "admin"}
           onClose={closeDayFlow}
           onSelect={(action) => setDayAction(action)}
           onBanRestChanged={refresh}
