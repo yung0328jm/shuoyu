@@ -63,6 +63,8 @@ export function PunchScanner({ onSuccess, onError }: PunchScannerProps) {
           fps: 10,
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1,
+          videoConstraints: { facingMode: "user" },
+          rememberLastUsedCamera: false,
         },
         false
       );
@@ -107,7 +109,7 @@ export function PunchScanner({ onSuccess, onError }: PunchScannerProps) {
         </button>
       )}
       <p className="text-center text-xs text-[#5a6578]">
-        第一次掃描 = 進廠 · 同日同案場第二次掃描 = 離廠
+        預設使用前置鏡頭 · 第一次掃描 = 進廠 · 同日同案場第二次 = 離廠
       </p>
     </div>
   );
