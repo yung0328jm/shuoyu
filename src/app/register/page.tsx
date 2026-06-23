@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { fetchRegistrationEnabled } from "@/lib/storage";
 
 const inputClass =
   "w-full rounded border border-[#2a3548] bg-[#0d1117] px-4 py-2.5 text-sm text-white focus:border-[#f0c040] focus:outline-none";
@@ -20,6 +21,18 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    void fetchRegistrationEnabled().then((enabled) => {
+      setAllowed(enabled);
+      setChecking(false);
+      if (!enabled) {
+        router.replace("/login");
+      }
+    });
+  }, [router]);
 
   const update = (key: string, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -54,11 +67,19 @@ export default function RegisterPage() {
     }
   };
 
+  if (checking || !allowed) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0e17] text-sm text-[#8b95a5]">
+        {checking ? "載入中..." : "註冊功能未開放"}
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0a0e17] px-6 py-12">
       <div className="w-full max-w-md rounded-lg border border-[#2a3548] bg-[#111827] p-8">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-[#f0c040]">爍宇事業群</h1>
+          <h1 className="text-2xl font-bold text-[#f0c040]">礫宇事業群</h1>
           <p className="mt-1 text-sm text-[#8b95a5]">建立新帳號</p>
         </div>
 

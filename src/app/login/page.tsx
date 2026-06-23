@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { fetchRegistrationEnabled } from "@/lib/storage";
 
 export default function LoginPage() {
   const { login, rememberedAccount } = useAuth();
@@ -13,6 +14,11 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(!!rememberedAccount);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [registrationEnabled, setRegistrationEnabled] = useState(false);
+
+  useEffect(() => {
+    void fetchRegistrationEnabled().then(setRegistrationEnabled);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +39,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-[#0a0e17] px-6">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-[#f0c040]">爍宇事業群</h1>
+          <h1 className="text-3xl font-bold text-[#f0c040]">礫宇事業群</h1>
           <p className="mt-2 text-[#8b95a5]">企業管理系統</p>
         </div>
 
@@ -90,19 +96,14 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-[#5a6578]">
-            還沒有帳號？
-            <Link href="/register" className="ml-1 text-[#f0c040] hover:underline">
-              立即註冊
-            </Link>
-          </p>
-        </div>
-
-        <div className="mt-6 rounded-lg border border-[#2a3548] bg-[#111827] p-4 text-xs text-[#5a6578]">
-          <p className="mb-2 text-[#8b95a5]">測試帳號</p>
-          <p>員工：employee / employee123</p>
-          <p>主管：manager / manager123</p>
-          <p>管理員：admin / admin123</p>
+          {registrationEnabled && (
+            <p className="mt-6 text-center text-sm text-[#5a6578]">
+              還沒有帳號？
+              <Link href="/register" className="ml-1 text-[#f0c040] hover:underline">
+                立即註冊
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </div>

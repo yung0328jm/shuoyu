@@ -98,5 +98,6 @@ insert into public.app_documents (id, data) values
   ('site_late_times', '{}'::jsonb),
   ('ban_rest_days', '[]'::jsonb),
   ('expenses', '[]'::jsonb),
-  ('contractors', '[]'::jsonb)
+  ('contractors', '[]'::jsonb),
+  ('app_settings', '{"registrationEnabled": false}'::jsonb)
 on conflict (id) do nothing;

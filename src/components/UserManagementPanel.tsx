@@ -7,6 +7,8 @@ import {
   registerUser,
   updateUser,
   deleteUser,
+  isRegistrationEnabled,
+  setRegistrationEnabled,
 } from "@/lib/storage";
 import { useAuth } from "@/context/AuthContext";
 import { useDataSyncVersion } from "@/hooks/useDataSyncVersion";
@@ -34,12 +36,14 @@ export function UserManagementPanel() {
     password: "",
     role: "employee" as UserRole,
   });
+  const [registrationOpen, setRegistrationOpen] = useState(false);
 
   const syncVersion = useDataSyncVersion();
   const refresh = () => setUsers(getUsers());
 
   useEffect(() => {
     refresh();
+    setRegistrationOpen(isRegistrationEnabled());
   }, [syncVersion]);
 
   const resetForm = () => {
@@ -115,6 +119,14 @@ export function UserManagementPanel() {
     setTimeout(() => setMessage(""), 3000);
   };
 
+  const handleRegistrationToggle = () => {
+    const next = !registrationOpen;
+    setRegistrationEnabled(next);
+    setRegistrationOpen(next);
+    setMessage(next ? "已開放自行註冊" : "已關閉自行註冊");
+    setTimeout(() => setMessage(""), 3000);
+  };
+
   const employees = users.filter((u) => u.role === "employee");
   const admins = users.filter((u) => u.role !== "employee");
 
@@ -123,6 +135,32 @@ export function UserManagementPanel() {
       {message && (
         <div className="rounded border border-[#34d399]/30 bg-[#34d399]/10 px-4 py-2 text-sm text-[#34d399]">
           {message}
+        </div>
+      )}
+
+      {currentUser?.role === "admin" && (
+        <div className="flex items-center justify-between rounded border border-[#2a3548] bg-[#111827] px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-white">開放自行註冊</p>
+            <p className="text-xs text-[#5a6578]">
+              關閉時登入頁不顯示註冊連結，新帳號僅能由管理員建立
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={registrationOpen}
+            onClick={handleRegistrationToggle}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+              registrationOpen ? "bg-[#34d399]" : "bg-[#2a3548]"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform ${
+                registrationOpen ? "translate-x-5" : ""
+              }`}
+            />
+          </button>
         </div>
       )}
 

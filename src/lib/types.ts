@@ -1,5 +1,9 @@
 export type UserRole = "employee" | "manager" | "admin";
 
+export interface AppSettings {
+  registrationEnabled: boolean;
+}
+
 export interface User {
   id: string;
   username: string;

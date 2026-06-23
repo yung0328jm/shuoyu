@@ -6,6 +6,7 @@ import {
   LeaveApplication,
   User,
   RemunerationParams,
+  AppSettings,
 } from "./types";
 import { DEFAULT_REMUNERATION_PARAMS } from "./remuneration-calc";
 import { DEMO_USERS } from "./demo-users";
@@ -36,6 +37,9 @@ const REMUNERATION_KEY = "shuoyu_remuneration";
 const LEAVES_KEY = "shuoyu_leaves";
 const REMUNERATION_PARAMS_KEY = "shuoyu_remuneration_params";
 const EMPLOYEE_PARAMS_KEY = "shuoyu_employee_params";
+const APP_SETTINGS_KEY = "shuoyu_app_settings";
+
+const DEFAULT_APP_SETTINGS: AppSettings = { registrationEnabled: false };
 
 function isBrowser() {
   return typeof window !== "undefined";
@@ -73,6 +77,7 @@ export function initStorage() {
   localInitKey(REMUNERATION_KEY, DEMO_REMUNERATION);
   localInitKey(LEAVES_KEY, []);
   localInitKey(EMPLOYEE_PARAMS_KEY, {});
+  localInitKey(APP_SETTINGS_KEY, DEFAULT_APP_SETTINGS);
 }
 
 export function getUsers(): User[] {
@@ -329,6 +334,11 @@ export async function selfRegister(data: {
   department: string;
   password: string;
 }): Promise<string | null> {
+  const enabled = await fetchRegistrationEnabled();
+  if (!enabled) {
+    return "目前未開放自行註冊，請聯絡管理員";
+  }
+
   if (!isSupabaseEnabled()) {
     const created = await registerUser({ ...data, role: "employee" });
     return created ? null : "帳號已被使用";
@@ -353,6 +363,44 @@ export async function selfRegister(data: {
 
 export function getEmployeeUsers(): User[] {
   return getUsers().filter((u) => u.role === "employee");
+}
+
+export function getAppSettings(): AppSettings {
+  if (isSupabaseEnabled()) {
+    return getDocument("app_settings", DEFAULT_APP_SETTINGS);
+  }
+  initStorage();
+  return localGet(APP_SETTINGS_KEY, DEFAULT_APP_SETTINGS);
+}
+
+export function saveAppSettings(settings: AppSettings) {
+  if (isSupabaseEnabled()) {
+    setDocument("app_settings", settings);
+    return;
+  }
+  localSave(APP_SETTINGS_KEY, settings);
+}
+
+export function isRegistrationEnabled(): boolean {
+  return getAppSettings().registrationEnabled;
+}
+
+export function setRegistrationEnabled(enabled: boolean) {
+  saveAppSettings({ ...getAppSettings(), registrationEnabled: enabled });
+}
+
+export async function fetchRegistrationEnabled(): Promise<boolean> {
+  if (!isSupabaseEnabled()) {
+    return isRegistrationEnabled();
+  }
+  try {
+    const res = await fetch("/api/settings/registration");
+    if (!res.ok) return false;
+    const data = (await res.json()) as { registrationEnabled?: boolean };
+    return data.registrationEnabled ?? false;
+  } catch {
+    return false;
+  }
 }
 
 export async function logoutUser() {
