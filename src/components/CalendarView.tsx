@@ -8,6 +8,7 @@ import {
 } from "@/lib/storage";
 import { formatMonthYear, getCalendarDays, getDatesBetween } from "@/lib/utils";
 import { SiteControlModal } from "@/components/SiteControlModal";
+import { LeaveDetailModal } from "@/components/LeaveDetailModal";
 import { CalendarActionModal, CalendarDayAction } from "@/components/CalendarActionModal";
 import { SiteEntryModal } from "@/components/SiteEntryModal";
 import { LeaveApplicationModal } from "@/components/LeaveApplicationModal";
@@ -42,6 +43,10 @@ export function CalendarView() {
   const [selectedSite, setSelectedSite] = useState<{
     date: string;
     site: string;
+  } | null>(null);
+  const [selectedLeave, setSelectedLeave] = useState<{
+    leave: LeaveApplication;
+    date: string;
   } | null>(null);
 
   const syncVersion = useDataSyncVersion();
@@ -106,7 +111,7 @@ export function CalendarView() {
           <span className="inline-block h-3 w-6 rounded bg-red-900/80" /> 禁休
         </span>
         <span className="ml-auto text-[#5a6578]">
-          點擊日期選擇功能 · 點擊案場查看進廠人員
+          點擊日期選擇功能 · 點擊案場查看進廠人員 · 點擊請假查看詳情
           {isManager && " · 管理員可審核/刪除"}
         </span>
       </div>
@@ -207,13 +212,20 @@ export function CalendarView() {
                     </button>
                   ))}
                   {dayLeaves.map((lv) => (
-                    <div
+                    <button
                       key={lv.id}
-                      className={`truncate rounded px-1.5 py-0.5 text-[11px] leading-tight ${LEAVE_COLORS[lv.status]}`}
-                      title={`${lv.userName} - ${LEAVE_TYPE_LABELS[lv.leaveType]}`}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (cell.inMonth) {
+                          setSelectedLeave({ leave: lv, date: cell.date });
+                        }
+                      }}
+                      className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] leading-tight transition-opacity hover:opacity-90 ${LEAVE_COLORS[lv.status]}`}
+                      title={`${lv.userName} - ${LEAVE_TYPE_LABELS[lv.leaveType]} — 點擊查看`}
                     >
                       {LEAVE_TYPE_LABELS[lv.leaveType]} {lv.userName}
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -221,6 +233,15 @@ export function CalendarView() {
           })}
         </div>
       </div>
+
+      {selectedLeave && (
+        <LeaveDetailModal
+          leave={selectedLeave.leave}
+          viewDate={selectedLeave.date}
+          onClose={() => setSelectedLeave(null)}
+          onUpdated={refresh}
+        />
+      )}
 
       {selectedSite && (
         <SiteControlModal
