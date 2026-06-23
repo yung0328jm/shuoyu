@@ -17,6 +17,7 @@ import {
   EXPENSE_STATUS_LABELS,
   EXPENSE_TYPE_LABELS,
 } from "@/lib/types";
+import { useDataSyncVersion } from "@/hooks/useDataSyncVersion";
 
 const STATUS_COLORS: Record<string, string> = {
   confirmed: "text-green-400 bg-green-400/10",
@@ -47,9 +48,11 @@ export function ExpensePanel() {
     );
   };
 
+  const syncVersion = useDataSyncVersion();
+
   useEffect(() => {
     refresh();
-  }, []);
+  }, [syncVersion]);
 
   useEffect(() => {
     if (sites.length > 0 && !formSite) {

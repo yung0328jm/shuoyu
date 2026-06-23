@@ -114,6 +114,15 @@ export async function loadAllData(): Promise<void> {
 }
 
 let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let visibilityHandler: (() => void) | null = null;
+
+function applyRemoteDocument(row: { id?: string; data?: unknown } | null) {
+  if (row?.id) {
+    cache.set(row.id, row.data);
+    notify();
+  }
+}
 
 export function subscribeRealtime() {
   if (!isSupabaseEnabled() || channel) return;
@@ -125,11 +134,9 @@ export function subscribeRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "app_documents" },
       (payload) => {
-        const row = payload.new as { id?: string; data?: unknown } | null;
-        if (row?.id) {
-          cache.set(row.id, row.data);
-          notify();
-        }
+        applyRemoteDocument(
+          payload.new as { id?: string; data?: unknown } | null
+        );
       }
     )
     .on(
@@ -139,10 +146,54 @@ export function subscribeRealtime() {
         void refreshProfiles();
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        void loadAllData();
+      }
+    });
+
+  startPolling();
+  startVisibilitySync();
+}
+
+function startPolling() {
+  if (!isSupabaseEnabled() || pollTimer) return;
+  pollTimer = setInterval(() => {
+    void loadAllData();
+  }, 4000);
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function startVisibilitySync() {
+  if (!isSupabaseEnabled() || visibilityHandler || typeof document === "undefined") {
+    return;
+  }
+  visibilityHandler = () => {
+    if (document.visibilityState === "visible") {
+      void loadAllData();
+    }
+  };
+  document.addEventListener("visibilitychange", visibilityHandler);
+  window.addEventListener("focus", visibilityHandler);
+}
+
+function stopVisibilitySync() {
+  if (visibilityHandler && typeof document !== "undefined") {
+    document.removeEventListener("visibilitychange", visibilityHandler);
+    window.removeEventListener("focus", visibilityHandler);
+    visibilityHandler = null;
+  }
 }
 
 export function unsubscribeRealtime() {
+  stopPolling();
+  stopVisibilitySync();
   if (channel) {
     const supabase = createClient();
     void supabase.removeChannel(channel);

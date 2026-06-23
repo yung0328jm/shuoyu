@@ -84,6 +84,7 @@ create policy "app_documents_all_authenticated"
 
 -- 5. 啟用 Realtime 即時同步
 alter publication supabase_realtime add table public.app_documents;
+alter table public.app_documents replica identity full;
 
 -- 6. 預設資料列（空陣列 / 物件，首次部署後由系統寫入）
 insert into public.app_documents (id, data) values

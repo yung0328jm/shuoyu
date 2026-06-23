@@ -14,6 +14,7 @@ import {
   saveLeaveApplications,
 } from "@/lib/storage";
 import { useAuth } from "@/context/AuthContext";
+import { useDataSyncVersion } from "@/hooks/useDataSyncVersion";
 
 interface PendingPanelProps {
   onUpdate?: () => void;
@@ -33,9 +34,11 @@ export function PendingPanel({ onUpdate, refreshKey = 0 }: PendingPanelProps) {
     setLeaves(getLeaveApplications().filter((l) => l.status === "pending"));
   }, []);
 
+  const syncVersion = useDataSyncVersion();
+
   useEffect(() => {
     refresh();
-  }, [refresh, refreshKey]);
+  }, [refresh, refreshKey, syncVersion]);
 
   const handleEntryAction = (
     id: string,

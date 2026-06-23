@@ -22,6 +22,7 @@ import {
   getPendingPurchaseCount,
 } from "@/lib/expenses";
 import { useAuth } from "@/context/AuthContext";
+import { useDataSyncVersion } from "@/hooks/useDataSyncVersion";
 
 interface ApprovalsPanelProps {
   onUpdate?: () => void;
@@ -43,9 +44,11 @@ export function ApprovalsPanel({ onUpdate }: ApprovalsPanelProps) {
     );
   };
 
+  const syncVersion = useDataSyncVersion();
+
   useEffect(() => {
     refresh();
-  }, []);
+  }, [syncVersion]);
 
   const handleEntryAction = (id: string, status: "approved" | "rejected") => {
     const all = getPendingEntries();

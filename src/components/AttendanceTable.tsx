@@ -16,6 +16,7 @@ import {
   getAllSiteLateSettings,
   setSiteLateTime,
 } from "@/lib/site-late-settings";
+import { useDataSyncVersion } from "@/hooks/useDataSyncVersion";
 
 const STATUS_COLORS: Record<AttendanceStatus, string> = {
   normal: "text-green-400 bg-green-400/10",
@@ -48,9 +49,11 @@ export function AttendanceTable() {
     setLateDraft(Object.fromEntries(settings.map((s) => [s.site, s.lateTime])));
   }, [user]);
 
+  const syncVersion = useDataSyncVersion();
+
   useEffect(() => {
     refresh();
-  }, [refresh]);
+  }, [refresh, syncVersion]);
 
   const filtered =
     filter === "all"

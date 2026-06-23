@@ -12,6 +12,7 @@ import {
   formatTime,
 } from "@/lib/site-entry";
 import { User } from "@/lib/types";
+import { useDataSyncVersion } from "@/hooks/useDataSyncVersion";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = ["00", "15", "30", "45"];
@@ -68,9 +69,11 @@ export function SiteEntryPanel({
     if (initialDate) setDate(initialDate);
   }, [initialDate]);
 
+  const syncVersion = useDataSyncVersion();
+
   useEffect(() => {
     refresh();
-  }, [date, site]);
+  }, [date, site, syncVersion]);
 
   const toggleEmployee = (id: string) => {
     setSelectedIds((prev) => {

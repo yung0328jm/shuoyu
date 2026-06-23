@@ -13,6 +13,7 @@ import {
 } from "@/lib/punch";
 import { getAttendanceRecords } from "@/lib/storage";
 import { AttendanceRecord, ATTENDANCE_STATUS_LABELS } from "@/lib/types";
+import { useDataSyncVersion } from "@/hooks/useDataSyncVersion";
 
 function PunchContent() {
   const { user } = useAuth();
@@ -35,9 +36,11 @@ function PunchContent() {
     );
   };
 
+  const syncVersion = useDataSyncVersion();
+
   useEffect(() => {
     refresh();
-  }, [user]);
+  }, [user, syncVersion]);
 
   useEffect(() => {
     if (!siteParam || !user || handledParam.current) return;

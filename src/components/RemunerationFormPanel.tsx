@@ -114,7 +114,7 @@ export function RemunerationFormPanel() {
         <div className="space-y-6">
           {cards.map((emp) => (
             <EmployeeRemunerationCard
-              key={`${emp.id}-${refreshKey}`}
+              key={`${emp.id}-${refreshKey}-${syncVersion}`}
               employee={emp}
               year={year}
               month={month}
