@@ -104,7 +104,7 @@ export function TodoPanel() {
           visible.map((item) => (
             <li
               key={item.id}
-              className="group flex items-start gap-3 px-4 py-3 hover:bg-[#0d1117]"
+              className="flex items-start gap-3 px-4 py-3 hover:bg-[#0d1117]"
             >
               <input
                 type="checkbox"
@@ -131,7 +131,7 @@ export function TodoPanel() {
               <button
                 type="button"
                 onClick={() => handleDelete(item.id)}
-                className="shrink-0 rounded px-2 py-1 text-xs text-[#5a6578] opacity-0 transition-opacity hover:bg-[#1a2234] hover:text-red-400 group-hover:opacity-100"
+                className="shrink-0 rounded px-2 py-1.5 text-xs font-medium text-red-400 hover:bg-red-400/10 hover:text-red-300"
                 title="刪除"
               >
                 刪除
