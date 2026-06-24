@@ -183,3 +183,13 @@ export const EXPENSE_STATUS_LABELS: Record<ExpenseStatus, string> = {
   approved: "已核准購買",
   rejected: "已駁回",
 };
+
+export interface TodoItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+  completedAt?: string;
+  createdBy?: string;
+  createdByName?: string;
+}

@@ -13,7 +13,8 @@ export type DocumentKey =
   | "ban_rest_days"
   | "expenses"
   | "contractors"
-  | "app_settings";
+  | "app_settings"
+  | "todos";
 
 const SYNC_CHANNEL = "shuoyu-sync";
 const POLL_INTERVAL_MS = 30_000;

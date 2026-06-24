@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { getPendingApprovalCount } from "@/components/ApprovalsPanel";
+import { getPendingTodoCount } from "@/lib/todos";
 import { useEffect, useState } from "react";
 import { useDataSyncVersion } from "@/hooks/useDataSyncVersion";
 import { UserRole } from "@/lib/types";
@@ -15,6 +16,7 @@ const navItems: {
   roles?: readonly UserRole[];
 }[] = [
   { href: "/calendar", label: "行事曆", icon: "📅" },
+  { href: "/todos", label: "代辦事項", icon: "☑️" },
   { href: "/site-entry", label: "入廠異動申請", icon: "🏗", roles: ["admin"] },
   { href: "/approvals", label: "待審核", icon: "✅", roles: ["admin", "manager"] },
   { href: "/remuneration", label: "勞務報酬單", icon: "📄" },
@@ -29,11 +31,13 @@ export function TopNav() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [pendingCount, setPendingCount] = useState(0);
+  const [todoCount, setTodoCount] = useState(0);
 
   const syncVersion = useDataSyncVersion();
 
   useEffect(() => {
     setPendingCount(getPendingApprovalCount());
+    setTodoCount(getPendingTodoCount());
   }, [pathname, syncVersion]);
 
   const handleLogout = async () => {
@@ -67,6 +71,11 @@ export function TopNav() {
               {item.href === "/approvals" && pendingCount > 0 && !active && (
                 <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                   {pendingCount}
+                </span>
+              )}
+              {item.href === "/todos" && todoCount > 0 && !active && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f0c040] px-1 text-[10px] font-bold text-[#1a1a1a]">
+                  {todoCount}
                 </span>
               )}
             </Link>
